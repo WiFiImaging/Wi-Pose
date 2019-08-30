@@ -12,7 +12,7 @@ class autoencoder():
             self,
             train_data = None,
             batch_size = 16,
-            learning_rate = 0.05,
+            learning_rate = 0.0001,
             training_epochs = 20,
             time_scale = 20,
             param_file = False,
@@ -49,8 +49,8 @@ class autoencoder():
     def build(self):
 
             self.input = tf.placeholder(tf.float32, shape = [None, 30, self.time_scale, 4], name='csi_input')
-            self.tag = tf.placeholder(tf.float32, shape = [None, 480, 640, 1], name ='image_origin')
-            self.output= tf.placeholder(tf.float32, shape = [None, 480, 640,1], name='image_output')
+            self.tag = tf.placeholder(tf.float32, shape = [None, 120, 160, 1], name ='image_origin')
+            self.output= tf.placeholder(tf.float32, shape = [None, 120, 160,1], name='image_output')
         
 
             with tf.variable_scope('CNN'):
@@ -58,61 +58,61 @@ class autoencoder():
                 w_initializer = tf.random_normal_initializer(0.,0.1)
                 b_initializer = tf.constant_initializer(0.1)
 
-                self.W_e_conv1 = tf.get_variable('w1', [3, 3, 4, 32], initializer=w_initializer)
-                b_e_conv1 = tf.get_variable('b1', [32, ], initializer=b_initializer)
+                self.W_e_conv1 = tf.get_variable('w1', [3, 3, 4, 16], initializer=w_initializer)
+                b_e_conv1 = tf.get_variable('b1', [16, ], initializer=b_initializer)
                 self.conv1 = tf.nn.relu(tf.add(self.conv2d(self.input, self.W_e_conv1), b_e_conv1))
                 print self.conv1.shape
 
-                self.W_e_conv2 = tf.get_variable('w2', [3, 3, 32, 32], initializer=w_initializer)
+                self.W_e_conv2 = tf.get_variable('w2', [3, 3, 16, 32], initializer=w_initializer)
                 b_e_conv2 = tf.get_variable('b2', [32, ], initializer=b_initializer)
                 self.conv2 = tf.nn.relu(tf.add(self.conv2d(self.conv1, self.W_e_conv2), b_e_conv2))
                 print self.conv2.shape
 
-                self.W_e_conv3 = tf.get_variable('w3', [3, 3, 32, 32], initializer=w_initializer)
-                b_e_conv3 = tf.get_variable('b3', [32, ], initializer=b_initializer)
+                self.W_e_conv3 = tf.get_variable('w3', [3, 3, 32, 64], initializer=w_initializer)
+                b_e_conv3 = tf.get_variable('b3', [64, ], initializer=b_initializer)
                 self.conv3 = tf.nn.relu(tf.add(self.conv2d(self.conv2, self.W_e_conv3), b_e_conv3))
                 print self.conv3.shape
             
 
-                self.W_e_conv4 = tf.get_variable('w4', [2, 2, 32, 32], initializer=w_initializer)
+                self.W_e_conv4 = tf.get_variable('w4', [1, 1, 64, 128], initializer=w_initializer)
                 b_e_conv4 = tf.get_variable('b4', [32, ], initializer=b_initializer)
                 self.conv4 = tf.nn.relu(tf.add(tf.nn.conv2d(self.conv3, self.W_e_conv4, strides=[1,1,1,1], padding='SAME'), b_e_conv4))
                 print self.conv4.shape
-                self.conv4 = tf.reshape(self.conv4, [-1, 4 * 3 * 32])
+                self.conv4 = tf.reshape(self.conv4, [-1, 4 * 5 * 128])
 
-                self.w2 = tf.get_variable('w5', [4 * 3 * 32, 30 * 40 * 4], initializer=w_initializer, )
-                self.b2 = tf.get_variable('b5', [30 * 40 * 4, ], initializer=b_initializer,)
+                self.w2 = tf.get_variable('w5', [4 * 5 * 128, 8 * 10 * 128], initializer=w_initializer, )
+                self.b2 = tf.get_variable('b5', [8 * 10 * 128, ], initializer=b_initializer,)
                 encoder = tf.nn.relu(tf.matmul(self.conv4, self.w2) + self.b2)
-                encoder = tf.reshape(encoder, [-1, 30, 40, 4])
+                encoder = tf.reshape(encoder, [-1, 8, 10, 128])
 
-                decoder_add = tf.image.resize_images(encoder, size=(60, 80),
+                decoder_add = tf.image.resize_images(encoder, size=(15, 20),
                                                    method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
-                self.W_d_conv_add = tf.get_variable('w_d_add', [2, 2, 4, 1], initializer=w_initializer)
+                self.W_d_conv_add = tf.get_variable('w_d_add', [1, 1, 128, 64], initializer=w_initializer)
                 decoder_add = tf.nn.conv2d(decoder_add, self.W_d_conv_add, strides=[1, 1, 1, 1], padding='SAME', )
                 decoder_add = tf.maximum(alpha * decoder_add, decoder_add)
 
 
-                decoder_1 = tf.image.resize_images(decoder_add, size=(120, 160),
+                decoder_1 = tf.image.resize_images(decoder_add, size=(30, 40),
                                                  method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
-                self.W_d_conv1 = tf.get_variable('w_d_1', [3, 3, 1, 1], initializer=w_initializer)
+                self.W_d_conv1 = tf.get_variable('w_d_1', [3, 3, 64, 32], initializer=w_initializer)
                 decoder_1 = tf.nn.conv2d(decoder_1, self.W_d_conv1, strides=[1, 1, 1, 1], padding='SAME', )
                 decoder_1 = tf.maximum(alpha * decoder_1, decoder_1)
 
-                decoder_2 = tf.image.resize_images(decoder_1, size=(240, 320),
+                decoder_2 = tf.image.resize_images(decoder_1, size=(60, 80),
                                                    method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
-                self.W_d_conv2 = tf.get_variable('w_d_2', [3, 3, 1, 1], initializer=w_initializer)
+                self.W_d_conv2 = tf.get_variable('w_d_2', [3, 3, 32, 8], initializer=w_initializer)
                 decoder_2 = tf.nn.conv2d(decoder_2, self.W_d_conv2, strides=[1, 1, 1, 1], padding='SAME', )
                 decoder_2 = tf.maximum(alpha * decoder_2, decoder_2)
                 print decoder_2.shape
 
-                decoder_3 = tf.image.resize_images(decoder_2, size=(480, 640),
+                decoder_3 = tf.image.resize_images(decoder_2, size=(120, 160),
                                                    method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
-                self.W_d_conv3 = tf.get_variable('w_d_3', [3, 3, 1, 1], initializer=w_initializer)
+                self.W_d_conv3 = tf.get_variable('w_d_3', [3, 3, 8, 1], initializer=w_initializer)
                 decoder_3 = tf.nn.conv2d(decoder_3, self.W_d_conv3, strides=[1, 1, 1, 1], padding='SAME', )
                 decoder_3 = tf.maximum(alpha * decoder_3, decoder_3)
                 print decoder_3.shape
 
-                self.output = tf.reshape(decoder_3, [-1, 480, 640,1])
+                self.output = tf.reshape(decoder_3, [-1, 120, 160,1])
                 max = tf.reduce_max(self.output)
                 min  = tf.reduce_min(self.output)
                 self.output=(self.output-min)/(max-min)
@@ -158,7 +158,7 @@ class autoencoder():
 
                 batch_ys = batch_ys.astype(np.float32)
                 batch_ys = np.nan_to_num(batch_ys)
-                batch_ys = np.reshape(batch_ys, [-1, 480, 640, 1])
+                batch_ys = np.reshape(batch_ys, [-1, 120, 160, 1])
                 batch_ys = np.clip(batch_ys, 1e-7, 0.9999999)
                 for i in range(2000):
                         loss = 0
@@ -198,7 +198,7 @@ class autoencoder():
 
             output = self.sess.run(self.output, feed_dict={self.input: batch_xs})
         
-            output = np.reshape(output, (-1, 480, 640, 1))
+            output = np.reshape(output, (-1, 120, 160, 1))
           
             for i in range(len(output)):
                 output[i] = output[i] * 255
